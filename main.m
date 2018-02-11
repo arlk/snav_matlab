@@ -35,26 +35,26 @@ while (~props_state.Data)
 end
 
 % Set Origin
-origin = getPose(receive(pose_sub,1));
+origin = unpackPoseMsg(receive(pose_sub,1));
 
 tic; quad = MissionState.OnGround
 while (1)
     t = toc;
-    pose = getPose(receive(pose_sub,1));
+    pose = unpackPoseMsg(receive(pose_sub,1));
     if (quad == MissionState.OnGround)
-        ref, done = takeoff(ref, pose, origin, t);
+        [ref, done] = takeoff(ref, pose, origin, t);
         if (done)
             ref.pos = pose.pos;
             tic; quad = MissionState.MissionReady
         end
     elseif (quad == MissionState.MissionReady)
-        ref, done = mission(ref, pose, origin, t);
+        [ref, done] = mission(ref, pose, origin, t);
         if (done)
             ref.pos = pose.pos;
             tic; quad = MissionState.MissionComplete
         end
     elseif (quad == MissionState.MissionComplete)
-        ref, done = landing(ref, pose, origin, t);
+        [ref, done] = landing(ref, pose, origin, t);
         if (done)
             break;
         end
