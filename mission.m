@@ -1,3 +1,3 @@
-function mission_complete = mission(pose, t)
-mission_complete = (t > 5)
+function ref, done = mission(ref, pose, origin, t)
+done = (t > 5);
 end

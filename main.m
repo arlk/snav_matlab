@@ -2,10 +2,8 @@
 
 clear all
 
-% Params
+% Time Step
 dt = 0.01;
-takeoff_height = 2;
-landing_speed = 0.5;
 
 % Setup
 start_props_pub = rospublisher('/start_props', 'std_msgs/Empty');
@@ -19,6 +17,13 @@ traj_cmd_msg = rosmessage(traj_cmd_pub);
 pose_sub = rossubscriber('/pose');
 props_state_sub = rossubscriber('/props_state');
 pause(2);
+
+% TODO: Add to a struct file
+ref.pos = [0 0 0];
+ref.vel = [0 0 0];
+ref.acc = [0 0 0];
+ref.yaw = 0;
+ref.dyaw = 0;
 
 % Start Props
 props_state.Data = false;
@@ -37,23 +42,24 @@ while (1)
     t = toc;
     pose = getPose(receive(pose_sub,1));
     if (quad == MissionState.OnGround)
-        pos_d = [0 0 takeoff_height] + origin.pos;
-        if (takeoffcond(pose, origin, t))
+        ref, done = takeoff(ref, pose, origin, t);
+        if (done)
+            ref.pos = pose.pos;
             tic; quad = MissionState.MissionReady
         end
     elseif (quad == MissionState.MissionReady)
-        mission_complete = mission(pose, origin, t)
-        if (mission_complete)
-            pos_d = pose.pos;
+        ref, done = mission(ref, pose, origin, t);
+        if (done)
+            ref.pos = pose.pos;
             tic; quad = MissionState.MissionComplete
         end
     elseif (quad == MissionState.MissionComplete)
-        pos_d(3) = pos_d(3) - landing_speed*dt;
-        if (landingcond(pose, origin, t))
+        ref, done = landing(ref, pose, origin, t);
+        if (done)
             break;
         end
     end
-    traj_cmd_msg.Data = [pos_d vel_d acc_d yaw_d yawd_d];
+    traj_cmd_msg.Data = [ref.pos ref.vel ref.acc ref.yaw ref.dyaw];
     send(traj_cmd_pub, traj_cmd_msg);
     pause(dt);
 end
