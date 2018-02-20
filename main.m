@@ -3,7 +3,7 @@
 clear all
 
 % Time Step
-dt = 0.01;
+dt = 0.002;
 
 % TODO: Remove this section later
 cmd_type_pub = rospublisher('/cmd_type', 'std_msgs/String');
@@ -31,26 +31,34 @@ ref.yaw = 0;
 ref.dyaw = 0;
 
 % TODO: Remove Later
-% cmd_type_msg.Data = 'SN_RC_RATES_CMD';
-% send(cmd_type_pub, cmd_type_msg);
+cmd_type_msg.Data = 'SN_RC_RATES_CMD';
+send(cmd_type_pub, cmd_type_msg);
 
 % Start Props
-props_state.Data = true;
-% props_state.Data = false;
+% props_state.Data = true;
+props_state.Data = false;
 while (~props_state.Data)
     props_state = receive(props_state_sub,1);
     send(gen_cmd_pub, gen_cmd_msg);
     send(start_props_pub, start_props_msg);
     pause(dt)
 end
-
+disp("Props spinning")
 % Set Origin
-[origin.pos, origin.ang] = unpackPoseMsg(receive(pose_sub,1));
+[origin.pos, origin.rot] = unpackPoseMsg(receive(pose_sub,1));
+rpy = rotm2eul(origin.rot);
+ref.yaw = rpy(3);
 
 tic; quad = MissionState.OnGround
+store.f = [];
+store.rate = [];
+store.pos = [];
+store.vel = [];
+store.refpos = [];
+store.rpy = [];
 while (1)
     t = toc;
-    [pose.pos, pose.ang] = unpackPoseMsg(receive(pose_sub,1));
+    [pose.pos, pose.rot] = unpackPoseMsg(receive(pose_sub,1));
     [pose.vel, pose.omg] = unpackVelMsg(receive(vel_sub,1));
     if (quad == MissionState.OnGround)
         [ref, done] = takeoff(ref, pose, origin, t, dt);
@@ -67,17 +75,21 @@ while (1)
     elseif (quad == MissionState.MissionComplete)
         [ref, done] = landing(ref, pose, origin, t, dt);
         if (done)
+            disp("Landing complete")
             break;
         end
     end
     traj_cmd_msg.Data = [ref.pos' ref.vel' ref.acc' ref.yaw ref.dyaw];
-    send(traj_cmd_pub, traj_cmd_msg);
-    [f, rate] = control(ref, pose, origin, t, dt)
-    gen_cmd_msg.Linear.X = rate(2);
-    gen_cmd_msg.Linear.Y = -rate(1);
-    gen_cmd_msg.Linear.Z = f;
-    gen_cmd_msg.Angular.Z = rate(3);
-    % send(gen_cmd_pub, gen_cmd_msg);
+    % send(traj_cmd_pub, traj_cmd_msg);
+    [f, rate] = control(ref, pose, origin, t, dt);
+    store.f(end+1) = f; store.rate(end+1, :) = rate; 
+    store.pos(end+1,:) = pose.pos - origin.pos; store.vel(end+1,:) = pose.vel;
+    store.refpos(end+1,:) = ref.pos; store.rpy(end+1,:) = rotm2eul(pose.rot);
+    gen_cmd_msg.Linear.X = rate(2); % rad/s
+    gen_cmd_msg.Linear.Y = -rate(1); % rad/s
+    gen_cmd_msg.Linear.Z = f*100; % grams
+    gen_cmd_msg.Angular.Z = 0; %rate(3); % rad/s
+    send(gen_cmd_pub, gen_cmd_msg);
     pause(dt);
 end
 
