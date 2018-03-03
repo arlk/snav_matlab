@@ -3,7 +3,7 @@
 clear all
 
 % Time Step
-dt = 0.002;
+dt = 1.0/50.0;
 
 % TODO: Remove this section later
 cmd_type_pub = rospublisher('/cmd_type', 'std_msgs/String');
@@ -82,9 +82,9 @@ while (1)
     traj_cmd_msg.Data = [ref.pos' ref.vel' ref.acc' ref.yaw ref.dyaw];
     % send(traj_cmd_pub, traj_cmd_msg);
     [f, rate] = control(ref, pose, origin, t, dt);
-    store.f(end+1) = f; store.rate(end+1, :) = rate; 
-    store.pos(end+1,:) = pose.pos - origin.pos; store.vel(end+1,:) = pose.vel;
-    store.refpos(end+1,:) = ref.pos; store.rpy(end+1,:) = rotm2eul(pose.rot);
+    % store.f(end+1) = f; store.rate(end+1, :) = rate;
+    % store.pos(end+1,:) = pose.pos - origin.pos; store.vel(end+1,:) = pose.vel;
+    % store.refpos(end+1,:) = ref.pos; store.rpy(end+1,:) = rotm2eul(pose.rot);
     gen_cmd_msg.Linear.X = rate(2); % rad/s
     gen_cmd_msg.Linear.Y = -rate(1); % rad/s
     gen_cmd_msg.Linear.Z = f*100; % grams
